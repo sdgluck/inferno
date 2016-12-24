@@ -3,6 +3,7 @@ import {
 	isArray,
 	isFunction,
 	isInvalid,
+	isStringOrNumber,
 	isNullOrUndef,
 	throwError,
 	ERROR_MSG,
@@ -43,7 +44,7 @@ export interface ComponentLifecycle<P, S> {
 	shouldComponentUpdate?(nextProps: P, nextState: S, nextContext: any): boolean;
 	componentWillUpdate?(nextProps: P, nextState: S, nextContext: any): void;
 	componentDidUpdate?(prevProps: P, prevState: S, prevContext: any): void;
-	componentWillUnmount?(): void;
+	componentWillUnmount?: () => void;
 }
 
 export interface Mixin<P, S> extends ComponentLifecycle<P, S> {
@@ -67,6 +68,10 @@ export interface ComponentSpec<P, S> extends Mixin<P, S> {
 // this is in shapes too, but we don't want to import from shapes as it will pull in a duplicate of createVNode
 function createVoidVNode(): VNode {
 	return createVNode(VNodeFlags.Void);
+}
+
+function createTextVNode(text): VNode {
+	return createVNode(VNodeFlags.Text, null, null, text);
 }
 
 function addToQueue(component: Component<any, any>, force: boolean, callback?: Function): void {
@@ -130,14 +135,16 @@ function applyState<P, S>(component: Component<P, S>, force: boolean, callback: 
 
 		if (isInvalid(nextInput)) {
 			nextInput = createVoidVNode();
+		} else if (nextInput === NO_OP) {
+			nextInput = component._lastInput;
+			didUpdate = false;
+		} else if (isStringOrNumber(nextInput)) {
+			nextInput = createTextVNode(nextInput);
 		} else if (isArray(nextInput)) {
 			if (process.env.NODE_ENV !== 'production') {
 				throwError('a valid Inferno VNode (or null) must be returned from a component render. You may have returned an array or an invalid object.');
 			}
 			throwError();
-		} else if (nextInput === NO_OP) {
-			nextInput = component._lastInput;
-			didUpdate = false;
 		}
 
 		const lastInput = component._lastInput;
@@ -194,8 +201,6 @@ export default class Component<P, S> implements ComponentLifecycle<P, S> {
 	_lastInput = null;
 	_vNode = null;
 	_unmounted = true;
-	_devToolsStatus = null;
-	_devToolsId = null;
 	_lifecycle = null;
 	_childContext = null;
 	_patch = null;
@@ -208,10 +213,6 @@ export default class Component<P, S> implements ComponentLifecycle<P, S> {
 
 		/** @type {object} */
 		this.context = context || {};
-
-		if (!this.componentDidMount) {
-			this.componentDidMount = null;
-		}
 	}
 
 	render(nextProps?: P, nextState?, nextContext?) {
@@ -241,12 +242,6 @@ export default class Component<P, S> implements ComponentLifecycle<P, S> {
 	}
 
 	componentWillMount() {
-	}
-
-	componentDidMount() {
-	}
-
-	componentWillUnmount() {
 	}
 
 	componentDidUpdate(prevProps: P, prevState: S, prevContext?: any) {

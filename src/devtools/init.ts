@@ -14,7 +14,7 @@ const functionalComponentWrappers = new Map();
 
 function wrapFunctionalComponent(vNode) {
 	const originalRender = vNode.type;
-	const name = vNode.type.name || '(Function.name missing)';
+	const name = vNode.type.name || 'Function (anonymous)';
 	const wrappers = functionalComponentWrappers;
 
 	if (!wrappers.has(originalRender)) {
@@ -32,6 +32,7 @@ function wrapFunctionalComponent(vNode) {
 		wrappers.set(originalRender, wrapper);
 	}
 	vNode.type = wrappers.get(originalRender);
+	vNode.ref = null;
 	vNode.flags = VNodeFlags.ComponentClass;
 }
 

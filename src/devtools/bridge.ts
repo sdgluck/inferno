@@ -1,6 +1,6 @@
 import { options } from 'inferno';
 import { VNodeFlags } from '../core/structures';
-import { isArray, isStringOrNumber, isObject } from '../shared';
+import { isArray, isStringOrNumber, isObject, isInvalid } from '../shared';
 
 function findVNodeFromDom(vNode, dom) {
 	if (!vNode) {
@@ -234,6 +234,16 @@ function updateReactComponent(vNode, parentDom) {
 
 }
 
+function normalizeChildren(children, dom) {
+	if (isArray(children)) {
+		return children.filter(child => !isInvalid(child)).map((child) =>
+			updateReactComponent(child, dom)
+		);
+	} else {
+		return !isInvalid(children) ? [updateReactComponent(children, dom)] : [];
+	}
+}
+
 /**
  * Create a ReactDOMComponent-compatible object for a given DOM node rendered
  * by Inferno.
@@ -244,6 +254,10 @@ function updateReactComponent(vNode, parentDom) {
  */
 function createReactDOMComponent(vNode, parentDom) {
 	const flags = vNode.flags;
+
+	if (flags & VNodeFlags.Void) {
+		return null;
+	}
 	const type = vNode.type;
 	const children = vNode.children;
 	const props = vNode.props;
@@ -255,9 +269,7 @@ function createReactDOMComponent(vNode, parentDom) {
 			type,
 			props
 		},
-		_renderedChildren: !isText && (isArray(children) ? children.map((child) =>
-			updateReactComponent(child, dom)
-		) : [updateReactComponent(children, dom)]),
+		_renderedChildren: !isText && normalizeChildren(children, dom),
 		_stringText: isText ? (children || vNode) : null,
 		_inDevTools: false,
 		node: dom || parentDom,

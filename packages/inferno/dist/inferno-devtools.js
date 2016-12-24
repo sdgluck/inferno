@@ -1,5 +1,5 @@
 /*!
- * inferno-devtools v1.0.0-beta38
+ * inferno-devtools v1.0.0-beta42
  * (c) 2016 Dominic Gannaway
  * Released under the MIT License.
  */
@@ -21,7 +21,9 @@ function isStringOrNumber(obj) {
     return isString(obj) || isNumber(obj);
 }
 
-
+function isInvalid(obj) {
+    return isNull(obj) || obj === false || isTrue(obj) || isUndefined(obj);
+}
 
 
 function isString(obj) {
@@ -30,8 +32,12 @@ function isString(obj) {
 function isNumber(obj) {
     return typeof obj === 'number';
 }
-
-
+function isNull(obj) {
+    return obj === null;
+}
+function isTrue(obj) {
+    return obj === true;
+}
 function isUndefined(obj) {
     return obj === undefined;
 }
@@ -239,6 +245,14 @@ function updateReactComponent(vNode, parentDom) {
     createInstanceFromVNode(vNode, newInstance);
     return newInstance;
 }
+function normalizeChildren(children, dom) {
+    if (isArray(children)) {
+        return children.filter(function (child) { return !isInvalid(child); }).map(function (child) { return updateReactComponent(child, dom); });
+    }
+    else {
+        return !isInvalid(children) ? [updateReactComponent(children, dom)] : [];
+    }
+}
 /**
  * Create a ReactDOMComponent-compatible object for a given DOM node rendered
  * by Inferno.
@@ -249,6 +263,9 @@ function updateReactComponent(vNode, parentDom) {
  */
 function createReactDOMComponent(vNode, parentDom) {
     var flags = vNode.flags;
+    if (flags & 4096 /* Void */) {
+        return null;
+    }
     var type = vNode.type;
     var children = vNode.children;
     var props = vNode.props;
@@ -259,7 +276,7 @@ function createReactDOMComponent(vNode, parentDom) {
             type: type,
             props: props
         },
-        _renderedChildren: !isText && (isArray(children) ? children.map(function (child) { return updateReactComponent(child, dom); }) : [updateReactComponent(children, dom)]),
+        _renderedChildren: !isText && normalizeChildren(children, dom),
         _stringText: isText ? (children || vNode) : null,
         _inDevTools: false,
         node: dom || parentDom,
@@ -353,7 +370,7 @@ function findRoots(roots) {
 var functionalComponentWrappers = new Map();
 function wrapFunctionalComponent(vNode) {
     var originalRender = vNode.type;
-    var name = vNode.type.name || '(Function.name missing)';
+    var name = vNode.type.name || 'Function (anonymous)';
     var wrappers = functionalComponentWrappers;
     if (!wrappers.has(originalRender)) {
         var wrapper = (function (Component$$1) {
@@ -380,6 +397,7 @@ function wrapFunctionalComponent(vNode) {
         wrappers.set(originalRender, wrapper);
     }
     vNode.type = wrappers.get(originalRender);
+    vNode.ref = null;
     vNode.flags = 4 /* ComponentClass */;
 }
 // Credit: this based on on the great work done with Preact and its devtools
